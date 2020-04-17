@@ -1,0 +1,79 @@
+/**
+ *  Domotopia Logger
+ *
+ *  Copyright 2020 Christian Nasulea
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ *  in compliance with the License. You may obtain a copy of the License at:
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
+ *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
+ *  for the specific language governing permissions and limitations under the License.
+ *
+ */
+definition(
+    name: "Domotopia Logger",
+    namespace: "domotopia",
+    author: "Christian Nasulea",
+    description: "SmartApp sending temperature data to Domotopia Logging Webservice",
+    category: "My Apps",
+    iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
+    iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
+    iconX3Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png")
+
+
+preferences {
+	section("Setup") {
+        input name:"tempdevices",type:"capability.temperatureMeasurement",title:"Which temperature devices?",multiple:false,required:true
+        input name: "coreid", type: "text", title: "Enter Domotopia 10-Digit Core ID", description: "Enter Domotopia Core ID", required: false
+	}
+}
+
+def installed() {
+	log.debug "Installed with settings: ${settings}"
+
+	initialize()
+}
+
+def updated() {
+	log.debug "Updated with settings: ${settings}"
+
+	unsubscribe()
+	initialize()
+}
+
+def initialize() {
+	// TODO: subscribe to attributes, devices, locations, etc.
+
+	log.debug "Core ID: $coreid"
+    queryTemp()
+    runEvery30Minutes(queryTemp)
+}
+
+// TODO: implement event handlers
+def queryTemp(){
+    settings.tempdevices.each() {
+        def latest = it.currentValue('temperature')
+        temperatureSend(latest)
+    }
+}
+
+def temperatureSend(evt) {
+    def params = [
+        uri: "https://u.domotopia.com/stt.php?c=$coreid&t1=$evt",
+    ]
+
+    try {
+        httpGet(params) { resp ->
+          resp.headers.each {
+            log.debug "${it.name} : ${it.value}"
+          }
+          log.debug "response contentType: ${resp.contentType}"
+          log.debug "response data: ${resp.data}"
+        }
+    } catch (e) {
+        log.error "something went wrong: $e"
+    }
+}
